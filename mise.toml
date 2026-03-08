@@ -1,0 +1,168 @@
+[env]
+RUST_LOG = "warning,spis=info"
+NGINX_PORT = "8080"
+DATABASE_URL = "sqlite:data/spis.db"
+SPIS_MEDIA_DIR = "{{cwd}}/data/media"
+SPIS_DATA_DIR = "{{cwd}}/data"
+SPIS_CONFIG_FILE = "{{cwd}}/config.toml"
+
+[tools]
+"cargo:sqlx-cli" = "0.8.6"
+"cargo:cargo-tarpaulin" = "0.35.0"
+"cargo:watchexec-cli" = "2.3.2"
+
+[tasks.setup]
+description = "Create required data directories and database"
+run = """
+  mkdir -p data/media data/thumbnails
+  sqlx database create
+  sqlx migrate run --source migrations
+"""
+
+[tasks.toolchain]
+description = "Create symlinks and verify rust toolchain"
+run = """
+  ln -sf AGENTS.md CLAUDE.md
+  ln -sf AGENTS.md GEMINI.md
+  rustup show
+"""
+
+[tasks.dev-clippy]
+description = "Watch source files and run clippy on changes"
+depends = ["setup"]
+run = "watchexec --stop-timeout=0 -r -e rs,toml,html,css -- cargo clippy -F dev -- --no-deps -D warnings"
+
+[tasks.dev-spis]
+description = "Watch source files and run spis on changes"
+depends = ["setup"]
+run = "watchexec --stop-timeout=0 -r -e rs,toml,html,css -- cargo run --color always -F dev"
+
+[tasks.dev-nginx]
+description = "Generate nginx config and run nginx"
+depends = ["setup"]
+run = "bash -c 'RUST_LOG=error cargo run -F dev -q -- template nginx --full > /tmp/nginx.conf && nginx -g \"daemon off;\" -c /tmp/nginx.conf'"
+
+[tasks.dev]
+description = "Run nginx and spis concurrently for local development"
+depends = ["setup"]
+run = """
+  mise run dev-nginx &
+  NGINX_PID=$!
+  trap "kill $NGINX_PID 2>/dev/null" EXIT INT TERM
+  mise run dev-spis
+"""
+
+[tasks.dev-clean]
+description = "Remove dev database and thumbnails"
+run = "rm -rf data/spis.db data/thumbnails"
+
+[tasks.lint-fmt]
+description = "Check code formatting"
+run = "cargo fmt -- --check"
+
+[tasks.lint-clippy]
+description = "Run clippy lints"
+depends = ["setup"]
+run = "cargo clippy -F dev -- --no-deps -D warnings"
+
+[tasks.lint-taplo]
+description = "Check TOML formatting"
+run = "taplo check config.toml"
+
+[tasks.lint]
+description = "Run all lints"
+depends = ["lint-fmt", "lint-clippy"]
+
+[tasks.test]
+description = "Run test suite with coverage"
+depends = ["setup"]
+run = "cargo tarpaulin --engine llvm --ignore-tests --color always --timeout 120 --skip-clean --out Xml"
+
+[tasks.ci]
+description = "Run lint and test"
+depends = ["lint", "test"]
+
+[tasks.template]
+description = "Regenerate example configs and verify no diff"
+depends = ["setup"]
+run = """
+  cargo build --color always
+  cargo run -q -- \
+    --server-socket /storage/spis/data/spis.sock \
+    --data-dir /storage/spis/data \
+    --media-dir /storage/spis/media template \
+    nginx --port 8080 > examples/systemd/nginx.conf
+  cargo run -q -- \
+    --server-socket /storage/spis/data/spis.sock \
+    --data-dir /storage/spis/data \
+    --media-dir /storage/spis/media template \
+    systemd --bin /usr/bin/spis --user www-data > examples/systemd/spis.service
+  cargo run -q -- \
+    --data-dir /tmp/spis_data \
+    --media-dir /tmp/spis_media template \
+    docker-compose > examples/docker/docker-compose.yml
+  git diff --exit-code
+"""
+
+[tasks.js-libs]
+description = "Download JS libraries and verify no diff"
+run = """
+  make -C assets/scripts
+  git add -A
+  git diff --cached --exit-code
+"""
+
+[tasks."release:x86_64"]
+description = "Build release binary for x86_64-unknown-linux-gnu"
+run = """
+  mise run setup
+  cargo build --locked --release --target x86_64-unknown-linux-gnu
+  mkdir -p release
+  cp target/x86_64-unknown-linux-gnu/release/spis release/spis-x86_64-unknown-linux-gnu
+"""
+
+[tasks."release:armv7"]
+description = "Build release binary for armv7-unknown-linux-gnueabihf"
+run = """
+  mise run setup
+  cargo build --locked --release --target armv7-unknown-linux-gnueabihf
+  mkdir -p release
+  cp target/armv7-unknown-linux-gnueabihf/release/spis release/spis-armv7-unknown-linux-gnueabihf
+"""
+
+[tasks."release:aarch64"]
+description = "Build release binary for aarch64-unknown-linux-gnu"
+run = """
+  mise run setup
+  cargo build --locked --release --target aarch64-unknown-linux-gnu
+  mkdir -p release
+  cp target/aarch64-unknown-linux-gnu/release/spis release/spis-aarch64-unknown-linux-gnu
+"""
+
+[tasks.docker-build]
+description = "Build local docker image"
+depends = ["release:x86_64"]
+run = "docker build -t spis-local -f docker/Dockerfile ."
+
+[tasks.docker-exec]
+description = "Shell into a locally built docker container"
+depends = ["docker-build"]
+run = "docker run -it --rm --entrypoint bash spis-local"
+
+[tasks.docker-run]
+description = "Run spis in docker locally"
+depends = ["docker-build"]
+run = """
+  docker run -it --rm \
+    -p 8080:8080 \
+    -v ${PWD}/data/media:/var/lib/spis/media \
+    -e SPIS_PROCESSING_RUN_ON_START=true \
+    spis-local
+"""
+
+[tasks.clean]
+description = "Remove all build artifacts"
+run = """
+  rm -rf target release data/spis.db data/thumbnails
+  cargo clean
+"""

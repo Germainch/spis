@@ -61,17 +61,6 @@
     {
       customType: 'regex',
       managerFilePatterns: [
-        '/^Makefile$/',
-        '/^\\.github/actions/toolchain/action\\.yml$/',
-      ],
-      matchStrings: [
-        '(?<depName>sqlx-cli|cargo-tarpaulin)@(?<currentValue>\\d+\\.\\d+\\.\\d+)',
-      ],
-      datasourceTemplate: 'crate',
-    },
-    {
-      customType: 'regex',
-      managerFilePatterns: [
         '/^assets/scripts/Makefile$/',
         '/^templates/web/index\\.html$/',
       ],

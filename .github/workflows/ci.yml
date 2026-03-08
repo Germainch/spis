@@ -36,9 +36,7 @@ jobs:
           cache-key: ubuntu-22.04-${{ matrix.target }}
 
       - name: Run ${{ matrix.target }}
-        run: make ${{ matrix.target }}
-        env:
-          DATABASE_URL: sqlite:data/spis.db
+        run: mise run ${{ matrix.target }}
 
       - name: Upload test coverage
         uses: codecov/codecov-action@v5

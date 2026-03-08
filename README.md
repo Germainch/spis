@@ -315,14 +315,18 @@ You can take a look at the [CHANGELOG](/CHANGELOG.md) for version information an
 
 ## Development
 
-I use [direnv](https://direnv.net/) to setup the development environment and `make` to run
-everything.
+I use [mise](https://mise.jdx.dev/) to manage the development environment, tooling, and tasks.
 
 ### Setup toolchain
 
 ```console
-# Setup rust toolchain
-$ make toolchain
+# Install mise: https://mise.jdx.dev/getting-started.html
+
+# Trust the mise config and install all tools
+$ mise trust && mise install
+
+# Setup rust toolchain and symlinks
+$ mise run toolchain
 
 # You need nginx installed on your system
 $ sudo apt install nginx
@@ -334,12 +338,8 @@ I leave it up do you to put some images/videos in the `./data/media` folder.
 
 ### Running
 
-Run stack with:
-
-```bash
-# If you don't have direnv installed load the env vars manually!
-. .envrc
-make dev
+```console
+$ mise run dev
 ```
 
 And then open http://localhost:8080 in your browser

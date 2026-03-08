@@ -47,12 +47,8 @@ runs:
       with:
         tool: taplo
 
-    - name: Install sqlx-cli
-      uses: taiki-e/cache-cargo-install-action@v3
+    - name: Install mise tools
+      uses: jdx/mise-action@v2
       with:
-        tool: sqlx-cli@0.8.6
-
-    - name: Install cargo-tarpaulin
-      uses: taiki-e/cache-cargo-install-action@v3
-      with:
-        tool: cargo-tarpaulin@0.35.0
+        install: true
+        experimental: true

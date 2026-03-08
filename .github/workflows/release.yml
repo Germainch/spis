@@ -35,9 +35,12 @@ jobs:
         uses: ./.github/actions/toolchain
 
       - name: Build spis release
-        run: make release/spis-${{ matrix.target }}
-        env:
-          DATABASE_URL: sqlite:data/spis.db
+        run: |
+          case "${{ matrix.target }}" in
+            x86_64-unknown-linux-gnu) mise run "release:x86_64" ;;
+            armv7-unknown-linux-gnueabihf) mise run "release:armv7" ;;
+            aarch64-unknown-linux-gnu) mise run "release:aarch64" ;;
+          esac
 
       - name: Store artifact
         uses: actions/upload-artifact@v7
