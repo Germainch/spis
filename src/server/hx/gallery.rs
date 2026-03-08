@@ -5,6 +5,7 @@ use chrono::Datelike;
 use super::Cursor;
 use super::GalleryState;
 use super::Media;
+use super::Subdir;
 use super::render::RenderResult;
 use super::render::ServerError;
 use super::render::TemplatedResponse;
@@ -54,6 +55,8 @@ struct HxGallery<'a> {
     bar_buttons: &'a Vec<BarButton>,
     features: &'a crate::server::Features,
     state: &'a GalleryState,
+    subdirs: &'a Vec<Subdir>,
+    breadcrumbs: &'a Vec<(String, String)>,
 
     media: &'a Vec<Media>,
     sse_media_before_skip: bool,
@@ -139,6 +142,46 @@ pub(super) async fn render(app_state: &AppState, state: GalleryState) -> RenderR
 
     buttons.push(BarButton::Collection(state.collection.is_some()));
 
+    let root = {
+        let mut r = config.root_path.clone();
+        if !r.ends_with('/') {
+            r.push('/');
+        }
+        r
+    };
+
+    let subdirs: Vec<Subdir> = if let Some(ref collection) = state.collection {
+        db::subdirs_list(pool, collection)
+            .await
+            .map_err(ServerError::DB)?
+            .into_iter()
+            .map(|name| {
+                let path = format!("{collection}{name}");
+                let display_name = name.trim_end_matches('/').to_string();
+                Subdir {
+                    name: display_name,
+                    path,
+                }
+            })
+            .collect()
+    } else {
+        Vec::new()
+    };
+
+    let breadcrumbs: Vec<(String, String)> = if let Some(ref col) = state.collection {
+        let relative = col.strip_prefix(root.as_str()).unwrap_or(col.as_str());
+        let mut crumbs = vec![("/".to_string(), root.clone())];
+        let mut accumulated = root.clone();
+        for segment in relative.split('/').filter(|s| !s.is_empty()) {
+            accumulated.push_str(segment);
+            accumulated.push('/');
+            crumbs.push((segment.to_string(), accumulated.clone()));
+        }
+        crumbs
+    } else {
+        Vec::new()
+    };
+
     let media = db::media_list(pool, &state, &state, PAGE_SIZE)
         .await
         .map_err(ServerError::DB)?
@@ -150,6 +193,8 @@ pub(super) async fn render(app_state: &AppState, state: GalleryState) -> RenderR
         bar_buttons: &buttons,
         features: &config.features,
         state: &state,
+        subdirs: &subdirs,
+        breadcrumbs: &breadcrumbs,
         media: &media,
         sse_media_before_skip: false,
         sse_media_after: None,

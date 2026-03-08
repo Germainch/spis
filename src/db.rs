@@ -210,7 +210,7 @@ impl Display for Filter {
         }
 
         if self.collection.is_some() {
-            f.write_str(" AND path LIKE '%' || ? || '%'")?;
+            f.write_str(" AND path LIKE ? || '%' AND INSTR(SUBSTR(path, LENGTH(?) + 1), '/') = 0")?;
         }
 
         Ok(())
@@ -237,6 +237,7 @@ impl Filter {
         }
 
         if let Some(collection) = &self.collection {
+            query = query.bind(collection);
             query = query.bind(collection);
         }
 
@@ -347,47 +348,21 @@ pub async fn media_get_uuid_by_path(pool: &SqlitePool, path: &str) -> Result<Opt
     Ok(res)
 }
 
-pub async fn collections_search(
-    pool: &SqlitePool,
-    media_dir: &str,
-    search_term: &str,
-) -> Result<Vec<String>> {
-    let mut search_pattern = String::from("%");
-    for c in search_term.chars().filter(|c| !c.is_whitespace()) {
-        search_pattern.push(c);
-        search_pattern.push('%');
-    }
-
-    let offset = i32::try_from(media_dir.len()).expect("Failed to convert media_dir length")
-        + if media_dir.ends_with('/') { 1 } else { 2 };
-
-    let mut res = sqlx::query_scalar::<_, String>(
+pub async fn subdirs_list(pool: &SqlitePool, parent_path: &str) -> Result<Vec<String>> {
+    let offset = i32::try_from(parent_path.len()).expect("path len fits i32") + 1;
+    sqlx::query_scalar::<_, String>(
         r"
-WITH RECURSIVE
-  folders(folder, rest) AS (
-    SELECT '', SUBSTR(path, ?1)
-    FROM media
-    UNION ALL
-    SELECT folder || SUBSTR(rest, 1, INSTR(rest, '/')),
-           SUBSTR(rest, INSTR(rest, '/') + 1)
-    FROM folders
-    WHERE INSTR(rest, '/') > 0
-  )
-SELECT DISTINCT folder
-FROM folders
-WHERE folder != ''
-  AND LOWER(folder) LIKE LOWER(?2)
-ORDER BY LENGTH(folder), folder COLLATE NOCASE
+SELECT DISTINCT SUBSTR(path, ?1, INSTR(SUBSTR(path, ?1), '/'))
+FROM media
+WHERE path LIKE ?2
+  AND INSTR(SUBSTR(path, ?1), '/') > 0
+  AND NOT missing
+ORDER BY 1 COLLATE NOCASE
         ",
     )
     .bind(offset)
-    .bind(search_pattern)
+    .bind(format!("{parent_path}%"))
     .fetch_all(pool)
-    .await?;
-
-    if search_term == "/" {
-        res.insert(0, "/".to_string());
-    }
-
-    Ok(res)
+    .await
+    .wrap_err("Failed to fetch subdirs")
 }

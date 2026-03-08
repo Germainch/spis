@@ -1,9 +1,7 @@
 use super::GalleryState;
 use super::gallery::render;
-use super::render::{RenderResult, ServerError, TemplatedResponse};
-use crate::db;
+use super::render::RenderResult;
 use crate::server::AppState;
-use askama::Template;
 use axum::extract::{Path, Query, State};
 use axum::{Router, routing::get};
 use serde::Deserialize;
@@ -56,20 +54,16 @@ async fn order(
     render(&app_state, state).await
 }
 
-#[derive(Deserialize, Debug, Clone)]
-pub(super) struct CollectionPick {
-    pick: Option<String>,
-}
-
 async fn collection(
     State(app_state): State<AppState>,
     Query(state): Query<GalleryState>,
-    Query(pick): Query<CollectionPick>,
 ) -> RenderResult {
-    let collection = if let Some(pick) = pick.pick {
-        Some(pick)
-    } else if state.collection.is_none() {
-        Some("/".to_string())
+    let collection = if state.collection.is_none() {
+        let mut root = app_state.config.root_path.clone();
+        if !root.ends_with('/') {
+            root.push('/');
+        }
+        Some(root)
     } else {
         None
     };
@@ -82,25 +76,21 @@ async fn collection(
 }
 
 #[derive(Deserialize, Debug, Clone)]
-pub(super) struct SearchQuery {
-    query: String,
+struct NavigateTo {
+    path: String,
 }
 
-#[derive(Template)]
-#[template(path = "web/bar/search.html")]
-struct HxSearchResults {
-    results: Vec<String>,
-}
-
-async fn search(
+async fn navigate(
     State(app_state): State<AppState>,
-    Query(search): Query<SearchQuery>,
+    Query(state): Query<GalleryState>,
+    Query(nav): Query<NavigateTo>,
 ) -> RenderResult {
-    let results =
-        db::collections_search(&app_state.pool, &app_state.config.root_path, &search.query)
-            .await
-            .map_err(ServerError::DB)?;
-    HxSearchResults { results }.render_response()
+    let state = GalleryState {
+        new_to_old: state.new_to_old,
+        collection: Some(nav.path),
+        ..Default::default()
+    };
+    render(&app_state, state).await
 }
 
 async fn clear(
@@ -121,6 +111,6 @@ pub fn create_router() -> Router<AppState> {
         .route("/month/{month}", get(month))
         .route("/order", get(order))
         .route("/collection", get(collection))
+        .route("/navigate", get(navigate))
         .route("/clear", get(clear))
-        .route("/search", get(search))
 }

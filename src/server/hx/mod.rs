@@ -49,6 +49,11 @@ impl From<(MediaRow, &PathFinder)> for Media {
     }
 }
 
+pub struct Subdir {
+    pub name: String,
+    pub path: String,
+}
+
 #[derive(Deserialize, Serialize, Default, Debug, Clone)]
 pub(super) struct GalleryState {
     favorite: Option<bool>,

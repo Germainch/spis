@@ -1,0 +1,12 @@
+{% if !subdirs.is_empty() %}
+<section class="dir-list">
+  {% for subdir in subdirs %}
+  <div hx-get="/hx/bar/navigate?path={{ subdir.path|urlencode }}"
+    hx-target="#hx-main" hx-swap="outerHTML"
+    class="link dir-card">
+    <i class="fa-solid fa-folder icon-orange"></i>
+    <span class="dir-card-name">{{ subdir.name }}</span>
+  </div>
+  {% endfor %}
+</section>
+{% endif %}

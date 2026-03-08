@@ -37,20 +37,16 @@
 </li>
 
 {% match state.collection %}
-{% when Some with (collection) %}
-<li class="bar-filter-item bar-search-container" _="
-  on focusout
-    if event.relatedTarget is null or I.contains(event.relatedTarget) == false
-    put '' into #search-results
-  end
-
-  on keyup(Escape) from .bar-search-input
-    put '' into #search-results
-  end
-">
-  <input type="text" name="query" placeholder="{{ collection }}" class="bar-search-input" hx-get="/hx/bar/search"
-    hx-trigger="focus, keyup changed delay:500ms" hx-target="#search-results" autocomplete="off">
-  <div id="search-results" class="bar-search-results"></div>
+{% when Some with (_) %}
+<li class="bar-filter-item bar-breadcrumb-container">
+  <nav class="bar-breadcrumb" aria-label="Directory path">
+    {% for (label, path) in breadcrumbs %}
+    <span hx-get="/hx/bar/navigate?path={{ path|urlencode }}"
+      hx-target="#hx-main" hx-swap="outerHTML"
+      class="link bar-breadcrumb-segment">{{ label }}</span>
+    {% if !loop.last %}<span class="bar-breadcrumb-sep">›</span>{% endif %}
+    {% endfor %}
+  </nav>
 </li>
 {% when None %}
 {% endmatch %}
