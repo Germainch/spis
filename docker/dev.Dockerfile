@@ -2,11 +2,17 @@
 FROM rust:latest AS builder
 WORKDIR /app
 
+RUN apt-get update && apt-get install -y sqlite3 && rm -rf /var/lib/apt/lists/*
+
 COPY Cargo.toml Cargo.lock rust-toolchain.toml ./
 COPY build.rs ./
-COPY src/ src/
 COPY migrations/ migrations/
+COPY src/ src/
 COPY templates/ templates/
+
+# Create a temporary DB with schema applied so sqlx can check queries at compile time
+RUN for f in $(ls migrations/*.sql | sort); do sqlite3 /tmp/spis-build.db < "$f"; done
+ENV DATABASE_URL=sqlite:///tmp/spis-build.db
 
 RUN cargo build --release --locked
 RUN cp target/release/spis /usr/bin/spis
