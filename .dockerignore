@@ -4,3 +4,11 @@
 # Except these
 !docker
 !release
+!src
+!migrations
+!templates
+!Cargo.toml
+!Cargo.lock
+!build.rs
+!.sqlx
+!rust-toolchain.toml
