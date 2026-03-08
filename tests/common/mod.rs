@@ -56,10 +56,9 @@ pub async fn spawn_server_with_features(
         features,
         pathfinder,
     };
-    let (media_events, _) = tokio::sync::broadcast::channel(100);
     let pool_clone = pool.clone();
     tokio::spawn(async move {
-        spis::server::run(Listener::Tcp(listener), pool_clone, media_events, config)
+        spis::server::run(Listener::Tcp(listener), pool_clone, config)
             .await
             .expect("Server failed");
     });

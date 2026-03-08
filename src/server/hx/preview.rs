@@ -1,4 +1,4 @@
-use crate::db;
+use crate::db::{self, Order};
 use crate::server::AppState;
 
 use super::GalleryState;
@@ -33,7 +33,7 @@ async fn root(
 ) -> RenderResult {
     let pool = &app_state.pool;
     let config = &app_state.config;
-    let res = db::media_get(pool, &state, &state, &uuid)
+    let res = db::media_get(pool, &state, Order::Desc, &uuid)
         .await
         .map_err(ServerError::DB)?;
 

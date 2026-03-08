@@ -2,8 +2,8 @@ use crate::server::AppState;
 
 use super::render::ServerError;
 use super::{GalleryState, Media};
+use crate::db::{self, Order};
 use crate::server::commands::CustomCommandTrigger;
-use crate::{MediaEvent, db};
 use axum::extract::{Json, Path, State};
 use axum::{Router, routing::post};
 use uuid::Uuid;
@@ -33,8 +33,6 @@ async fn archive(
         db::media_archive(pool, &uuid, true)
             .await
             .map_err(ServerError::DB)?;
-
-        let _ = app_state.media_events.send(MediaEvent::Archived(uuid));
     }
 
     Ok(())
@@ -62,14 +60,9 @@ async fn command(
         // We need to fetch the media to pass to the command runner
         // Using media_get with empty query/state is a bit heavy but works
         // Ideally we'd have a lighter `media_get_by_uuid`
-        let (_, media, _) = db::media_get(
-            pool,
-            &GalleryState::default(),
-            &GalleryState::default(),
-            &uuid,
-        )
-        .await
-        .map_err(ServerError::DB)?;
+        let (_, media, _) = db::media_get(pool, &GalleryState::default(), Order::Desc, &uuid)
+            .await
+            .map_err(ServerError::DB)?;
 
         if let Some(media) = media {
             let media: Media = (media, &config.pathfinder).into();
@@ -100,14 +93,9 @@ async fn favorite(
 
     // Check state of selected items
     for uuid in &uuids {
-        let (_, media, _) = db::media_get(
-            pool,
-            &GalleryState::default(),
-            &GalleryState::default(),
-            uuid,
-        )
-        .await
-        .map_err(ServerError::DB)?;
+        let (_, media, _) = db::media_get(pool, &GalleryState::default(), Order::Desc, uuid)
+            .await
+            .map_err(ServerError::DB)?;
 
         if let Some(media) = media {
             if !media.favorite {
@@ -121,7 +109,6 @@ async fn favorite(
         db::media_favorite(pool, &uuid, make_fav)
             .await
             .map_err(ServerError::DB)?;
-        let _ = app_state.media_events.send(MediaEvent::Changed(uuid));
     }
 
     Ok(())

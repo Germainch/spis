@@ -7,7 +7,7 @@ SPIS_DATA_DIR = "{{cwd}}/data"
 SPIS_CONFIG_FILE = "{{cwd}}/config.toml"
 
 [tools]
-"cargo:sqlx-cli" = "0.8.6"
+"cargo:sqlx-cli" = { version="0.8.6", features="openssl-vendored" }
 "cargo:cargo-tarpaulin" = "0.35.0"
 "cargo:watchexec-cli" = "2.3.2"
 
@@ -107,7 +107,11 @@ run = """
 [tasks.js-libs]
 description = "Download JS libraries and verify no diff"
 run = """
-  make -C assets/scripts
+  HTMX_VERSION=2.0.8
+  HYPERSCRIPT_VERSION=0.9.14
+  DIR=assets/scripts
+  wget -nc https://unpkg.com/htmx.org@${HTMX_VERSION}/dist/htmx.min.js -O ${DIR}/htmx-${HTMX_VERSION}.js
+  wget -nc https://unpkg.com/hyperscript.org@${HYPERSCRIPT_VERSION}/dist/_hyperscript.min.js -O ${DIR}/hyperscript-${HYPERSCRIPT_VERSION}.js
   git add -A
   git diff --cached --exit-code
 """
@@ -154,6 +158,18 @@ run = """
     -p 8080:8080 \
     -v ${PWD}/data/media:/var/lib/spis/media \
     -e SPIS_PROCESSING_RUN_ON_START=true \
+    spis-local
+"""
+
+[tasks.docker-dev]
+description = "Run spis in docker locally"
+depends = ["docker-build"]
+run = """
+  docker run -it --rm \
+    -p 8080:8080 \
+    -v ${PWD}/data/media:/var/lib/spis/media \
+    -e SPIS_PROCESSING_RUN_ON_START=true \
+    -e SPIS_MEDIA_FETCH_STOCK=300 \
     spis-local
 """
 

@@ -6,7 +6,7 @@ use serde::{Deserialize, Serialize};
 use uuid::Uuid;
 
 use crate::server::AppState;
-use crate::{PathFinder, db::Filter, db::MediaRow, db::Order};
+use crate::{PathFinder, db::Filter, db::MediaRow};
 
 use std::path::Path;
 
@@ -15,7 +15,6 @@ mod bar;
 mod gallery;
 mod preview;
 mod render;
-mod sse;
 
 #[derive(Clone)]
 pub struct Media {
@@ -56,69 +55,17 @@ pub struct Subdir {
 
 #[derive(Deserialize, Serialize, Default, Debug, Clone)]
 pub(super) struct GalleryState {
-    favorite: Option<bool>,
     collection: Option<String>,
-    year: Option<usize>,
-    month: Option<u8>,
-    new_to_old: Option<bool>,
-}
-
-impl GalleryState {
-    pub fn as_query(&self) -> String {
-        serde_urlencoded::to_string(self).unwrap_or_default()
-    }
-}
-
-fn to_timestamp(s: &str) -> DateTime<Utc> {
-    DateTime::parse_from_rfc3339(s)
-        .expect("malformed timestamp")
-        .with_timezone(&Utc)
 }
 
 impl From<&GalleryState> for Filter {
     fn from(value: &GalleryState) -> Self {
-        let (start, end) = value.year.map_or((None, None), |year| {
-            let start = to_timestamp(&format!(
-                "{}-{:02}-01T00:00:00-00:00",
-                year,
-                value.month.unwrap_or(1)
-            ));
-
-            let next_year = format!("{}-01-01T00:00:00-00:00", year + 1);
-            let end = to_timestamp(&match value.month {
-                None => next_year,
-                Some(month) => {
-                    if month == 12 {
-                        next_year
-                    } else {
-                        format!("{}-{:02}-01T00:00:00-00:00", year, month + 1,)
-                    }
-                }
-            });
-            (Some(start), Some(end))
-        });
-
-        let favorite = if matches!(value.favorite, Some(true)) {
-            Some(true)
-        } else {
-            None
-        };
-
         Self {
             archived: false,
-            favorite,
-            taken_after: start,
-            taken_before: end,
+            favorite: None,
+            taken_after: None,
+            taken_before: None,
             collection: value.collection.clone(),
-        }
-    }
-}
-
-impl From<&GalleryState> for Order {
-    fn from(value: &GalleryState) -> Self {
-        match value.new_to_old {
-            Some(true) | None => Self::Desc,
-            Some(false) => Self::Asc,
         }
     }
 }
@@ -131,11 +78,7 @@ struct Cursor {
 impl From<(&GalleryState, &Cursor)> for Filter {
     fn from(value: (&GalleryState, &Cursor)) -> Self {
         let mut filter: Self = value.0.into();
-        let order: Order = value.0.into();
-        match order {
-            Order::Asc => filter.taken_after = Some(value.1.cursor),
-            Order::Desc => filter.taken_before = Some(value.1.cursor),
-        }
+        filter.taken_before = Some(value.1.cursor);
         filter
     }
 }
@@ -163,5 +106,4 @@ pub fn create_router() -> Router<AppState> {
         .nest("/bar", bar::create_router())
         .nest("/gallery", gallery::create_router())
         .nest("/preview", preview::create_router())
-        .nest("/sse", sse::create_router())
 }

@@ -1,4 +1,3 @@
-use crate::MediaEvent;
 use crate::db;
 use crate::media::MediaProcessor;
 use crate::media::{self, ProcessedMedia};
@@ -17,7 +16,6 @@ use rayon::prelude::*;
 use sqlx::{Pool, Sqlite};
 use std::collections::HashMap;
 use std::{collections::HashSet, path::PathBuf};
-use tokio::sync::broadcast;
 use tokio::sync::mpsc::{Receiver, Sender, channel};
 use tokio::time::sleep;
 use uuid::Uuid;
@@ -35,7 +33,6 @@ pub type File = (Option<Uuid>, PathBuf);
 pub fn setup_filewatcher(
     pool: Pool<Sqlite>,
     file_sender: Sender<File>,
-    media_events: broadcast::Sender<MediaEvent>,
 ) -> Result<RecommendedWatcher> {
     // Setup debouncer channel
     let (debouncer_sender, mut debouncer_receiver): (
@@ -98,9 +95,6 @@ pub fn setup_filewatcher(
                     tracing::info!("Marking removed file as archived: {}", path_string);
                     if let Err(e) = db::media_archive(&pool, &uuid, true).await {
                         tracing::error!("Failed to archive removed media: {}", e);
-                    }
-                    if let Err(e) = media_events.send(MediaEvent::Archived(uuid)) {
-                        tracing::error!("Failed to send archived event: {}", e);
                     }
                 }
                 Ok(None) => {
@@ -181,13 +175,10 @@ pub fn setup_filewalker(
                 }
             };
 
-            let old_uuids = match db::media_hashmap(&pool).await {
-                Ok(map) => map,
-                Err(error) => {
-                    tracing::error!("Failed to get old entries: {:?}", error);
-                    HashMap::with_capacity(0)
-                }
-            };
+            let old_uuids = db::media_hashmap(&pool).await.unwrap_or_else(|error| {
+                tracing::error!("Failed to get old entries: {:?}", error);
+                HashMap::with_capacity(0)
+            });
 
             tracing::debug!("Setup walk thread");
             let (walk_finished_sender, walk_finished_receiver) = tokio::sync::oneshot::channel();
@@ -357,11 +348,7 @@ pub fn setup_media_processing(
     Ok((file_sender, media_receiver))
 }
 
-pub fn setup_db_store(
-    pool: Pool<Sqlite>,
-    media_events: broadcast::Sender<MediaEvent>,
-    media_receiver: Receiver<ProcessedMedia>,
-) -> Result<()> {
+pub fn setup_db_store(pool: Pool<Sqlite>, media_receiver: Receiver<ProcessedMedia>) -> Result<()> {
     tracing::debug!("Setup db store");
 
     tokio::spawn(async move {
@@ -369,18 +356,9 @@ pub fn setup_db_store(
 
         let mut media_receiver = media_receiver;
         while let Some(media) = media_receiver.recv().await {
-            let new = media.data.is_some();
-            tracing::debug!(
-                "Update media {} (new: {}): {}",
-                &media.uuid,
-                new,
-                &media.path
-            );
-            let uuid = media.uuid;
+            tracing::debug!("Update media {}: {}", &media.uuid, &media.path);
             if let Err(error) = db::media_insert(&pool, media).await {
                 tracing::error!("Failed inserting media to db: {:?}", error);
-            } else if new {
-                let _ = media_events.send(MediaEvent::Added(uuid));
             }
         }
         tracing::warn!("media_channel was closed");

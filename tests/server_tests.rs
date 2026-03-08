@@ -1,5 +1,5 @@
 mod common;
-use chrono::{Datelike, Utc};
+use chrono::Utc;
 
 #[tokio::test]
 async fn test_server_index_redirect() {
@@ -39,73 +39,6 @@ async fn test_gallery_more() {
     let query = serde_urlencoded::to_string(params).expect("Failed to encode query");
     let response = client
         .get(format!("{}/hx/gallery/more?{}", addr, query))
-        .send()
-        .await
-        .expect("Request failed");
-    assert!(response.status().is_success());
-}
-
-#[tokio::test]
-async fn test_bar_endpoints() {
-    let (addr, _pool, _file) = common::spawn_server().await;
-    let client = reqwest::Client::new();
-
-    // clear
-    let response = client
-        .get(format!("{}/hx/bar/clear", addr))
-        .send()
-        .await
-        .expect("Request failed");
-    assert!(response.status().is_success());
-
-    // favorite
-    let response = client
-        .get(format!("{}/hx/bar/favorite", addr))
-        .send()
-        .await
-        .expect("Request failed");
-    assert!(response.status().is_success());
-
-    // order
-    let response = client
-        .get(format!("{}/hx/bar/order", addr))
-        .send()
-        .await
-        .expect("Request failed");
-    assert!(response.status().is_success());
-
-    // year
-    let year = Utc::now().year();
-    let response = client
-        .get(format!("{}/hx/bar/year/{}", addr, year))
-        .send()
-        .await
-        .expect("Request failed");
-    assert!(response.status().is_success());
-
-    // year toggle (same year)
-    let response = client
-        .get(format!("{}/hx/bar/year/{}?year={}", addr, year, year))
-        .send()
-        .await
-        .expect("Request failed");
-    assert!(response.status().is_success());
-
-    // month
-    let month = Utc::now().month();
-    let response = client
-        .get(format!("{}/hx/bar/month/{}?year={}", addr, month, year))
-        .send()
-        .await
-        .expect("Request failed");
-    assert!(response.status().is_success());
-
-    // month toggle
-    let response = client
-        .get(format!(
-            "{}/hx/bar/month/{}?year={}&month={}",
-            addr, month, year, month
-        ))
         .send()
         .await
         .expect("Request failed");

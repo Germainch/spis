@@ -15,7 +15,6 @@
   <link rel="stylesheet" href="/assets/fa/css/all.min.css">
 
   <script src="/assets/scripts/htmx-2.0.8.js"></script>
-  <script src="/assets/scripts/htmx-sse-2.2.4.js"></script>
   <script src="/assets/scripts/hyperscript-0.9.14.js"></script>
   {% if self::dev_enabled() %}
   <script src="/assets/scripts/dev-ws.js"></script>
@@ -35,7 +34,7 @@
 </head>
 
 <body>
-  <div hx-get="/hx/gallery" hx-trigger="load" hx-swap="outerHTML" />
+  <div hx-get="/hx/gallery" hx-trigger="load" hx-swap="outerHTML"></div>
 </body>
 
 </html>
