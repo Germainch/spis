@@ -1,10 +1,8 @@
 # Stage 1: Compile
 FROM rust:latest AS builder
 WORKDIR /app
-ENV SQLX_OFFLINE=true
 
 COPY Cargo.toml Cargo.lock rust-toolchain.toml ./
-COPY .sqlx/ .sqlx/
 COPY build.rs ./
 COPY src/ src/
 COPY migrations/ migrations/
