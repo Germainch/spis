@@ -9,6 +9,7 @@ COPY build.rs ./
 COPY migrations/ migrations/
 COPY src/ src/
 COPY templates/ templates/
+COPY assets/ assets/
 
 # Create a temporary DB with schema applied so sqlx can check queries at compile time
 RUN for f in $(ls migrations/*.sql | sort); do sqlite3 /tmp/spis-build.db < "$f"; done
