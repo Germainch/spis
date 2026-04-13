@@ -39,7 +39,7 @@ jobs:
         run: mise run ${{ matrix.target }}
 
       - name: Upload test coverage
-        uses: codecov/codecov-action@v5
+        uses: codecov/codecov-action@v6
         if: matrix.target == 'test'
         env:
           CODECOV_TOKEN: ${{ secrets.CODECOV_TOKEN }}
